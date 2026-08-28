@@ -1,0 +1,13 @@
+---
+import { getCollection } from "astro:content";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import ObjectCard from "../components/astro/ObjectCard.astro";
+
+const objects = await getCollection("objects");
+---
+<BaseLayout title="Object Plan Viewer">
+  <h1 class="mb-6 text-2xl font-semibold">Object Plan Viewer</h1>
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    {objects.map((obj) => <ObjectCard object={obj} />)}
+  </div>
+</BaseLayout>

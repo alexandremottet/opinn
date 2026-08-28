@@ -1,0 +1,50 @@
+---
+import { getCollection } from "astro:content";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import ObjectViewer3D from "../../components/react/ObjectViewer3D";
+
+export async function getStaticPaths() {
+  const objects = await getCollection("objects");
+  return objects.map((entry) => ({
+    params: { slug: entry.slug },
+    props: { entry },
+  }));
+}
+
+const { entry } = Astro.props;
+const { data } = entry;
+const { Content } = await entry.render();
+---
+
+<BaseLayout title={data.name}>
+  <a href="/" class="text-sm text-neutral-500 hover:underline"
+    >&larr; All objects</a
+  >
+  <h1 class="mt-2 text-2xl font-semibold">{data.name}</h1>
+  <p class="mt-1 text-neutral-600">
+    {data.dimensions.widthMm} × {data.dimensions.heightMm} × {
+      data.dimensions.depthMm
+    } mm
+  </p>
+
+  <div class="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-2">
+    <div class="aspect-square w-full">
+      <ObjectViewer3D
+        client:only="react"
+        objectData={data}
+        edgeColorBackground
+      />
+    </div>
+
+    <div class="prose prose-neutral max-w-none">
+      <Content />
+      <a
+        href={data.downloadFile.path}
+        download
+        class="mt-4 inline-block rounded-md bg-ink px-4 py-2 text-sm text-white hover:bg-neutral-800"
+      >
+        {data.downloadFile.label}
+      </a>
+    </div>
+  </div>
+</BaseLayout>

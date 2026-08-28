@@ -1,0 +1,6 @@
+Placeholder schema — IKEA-style Cabinet Door
+
+Dimensions: 396 x 596 x 18 mm (width x height x depth)
+Edge options: 0mm / 1mm / 2mm / 4mm
+
+Replace this file with the real measurement schema/PDF when available.

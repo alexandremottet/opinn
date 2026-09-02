@@ -17,9 +17,6 @@ const { Content } = await entry.render();
 ---
 
 <BaseLayout title={data.name}>
-  <a href="/" class="text-sm text-neutral-500 hover:underline"
-    >&larr; All objects</a
-  >
   <h1 class="mt-2 text-2xl font-semibold">{data.name}</h1>
   <p class="mt-1 text-neutral-600">
     {data.dimensions.widthMm} × {data.dimensions.heightMm} × {

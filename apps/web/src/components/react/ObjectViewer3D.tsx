@@ -1,7 +1,11 @@
-import { useRef, useState, type ReactNode } from "react";
+import { Suspense, useRef, useState, type ReactNode } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { ObjectData } from "../../types/object";
+import {
+  VALCHROMAT_COLORS,
+  type ValchromatColor,
+} from "../../data/valchromatColors";
 import CabinetDoorMesh from "./scene/CabinetDoorMesh";
 import GenericObjectMesh from "./scene/GenericObjectMesh";
 import Backdrop from "./scene/Backdrop";
@@ -17,33 +21,25 @@ interface Props {
 const SWAY_AMPLITUDE = THREE.MathUtils.degToRad(8);
 const SWAY_SPEED = 0.5;
 
-const EDGE_COLOR_PRESETS = [
-  "#3b82f6",
-  "#ef4444",
-  "#22c55e",
-  "#f59e0b",
-  "#a855f6",
-  "#ec4899",
-];
-
 function ColorCircle({
   color,
   selected,
   onSelect,
 }: {
-  color: string;
+  color: ValchromatColor;
   selected: boolean;
   onSelect: () => void;
 }) {
   return (
     <button
       type="button"
-      aria-label={`Use ${color} edge color`}
+      aria-label={`Use ${color.label}`}
+      title={color.label}
       onClick={onSelect}
       className={`h-6 w-6 rounded-full border-2 transition ${
         selected ? "border-neutral-900" : "border-transparent"
       }`}
-      style={{ backgroundColor: color }}
+      style={{ backgroundColor: color.hex }}
     />
   );
 }
@@ -85,7 +81,20 @@ export default function ObjectViewer3D({
   const [edgeWidthMm, setEdgeWidthMm] = useState<number>(
     edgeWidthRange?.default ?? 0,
   );
-  const [edgeColor, setEdgeColor] = useState<string>(EDGE_COLOR_PRESETS[0]);
+  const contentColorHex = objectData.cabinetDoor?.colorHex?.toLowerCase();
+  const defaultDoorColorId =
+    VALCHROMAT_COLORS.find((c) => c.hex.toLowerCase() === contentColorHex)
+      ?.id ?? VALCHROMAT_COLORS[0].id;
+
+  const [edgeColorId, setEdgeColorId] = useState<string>(
+    VALCHROMAT_COLORS[0].id,
+  );
+  const [doorColorId, setDoorColorId] = useState<string>(defaultDoorColorId);
+
+  const edgeSwatch =
+    VALCHROMAT_COLORS.find((c) => c.id === edgeColorId) ?? VALCHROMAT_COLORS[0];
+  const doorSwatch =
+    VALCHROMAT_COLORS.find((c) => c.id === doorColorId) ?? VALCHROMAT_COLORS[0];
 
   return (
     <div className="relative flex h-full w-full flex-col">
@@ -94,8 +103,9 @@ export default function ObjectViewer3D({
           aria-hidden
           className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[160%] w-[160%] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-40 blur-3xl transition-colors duration-1000 ease-out"
           style={{
-            backgroundColor: edgeColor,
-            WebkitMaskImage: "radial-gradient(circle, black 0%, transparent 70%)",
+            backgroundColor: edgeSwatch.hex,
+            WebkitMaskImage:
+              "radial-gradient(circle, black 0%, transparent 70%)",
             maskImage: "radial-gradient(circle, black 0%, transparent 70%)",
           }}
         />
@@ -106,22 +116,24 @@ export default function ObjectViewer3D({
           shadows="variance"
           dpr={[1, 2]}
           gl={{ alpha: true }}
-          camera={{ position: [0.9, 0.35, 0.9], fov: 35 }}
+          camera={{ position: [0.5, 0.35, 0.9], fov: 35 }}
         >
           <SceneLighting />
           <CameraSway enabled={cameraSway} />
-          <RotatingRig>
-            {objectData.kind === "cabinet-door" ? (
-              <CabinetDoorMesh
-                dimensions={objectData.dimensions}
-                colorHex={objectData.cabinetDoor?.colorHex ?? "#efece4"}
-                edgeWidthMm={edgeWidthMm}
-                edgeColor={edgeColor}
-              />
-            ) : (
-              <GenericObjectMesh dimensions={objectData.dimensions} />
-            )}
-          </RotatingRig>
+          <Suspense fallback={null}>
+            <RotatingRig>
+              {objectData.kind === "cabinet-door" ? (
+                <CabinetDoorMesh
+                  dimensions={objectData.dimensions}
+                  edgeWidthMm={edgeWidthMm}
+                  edgeSwatch={edgeSwatch}
+                  doorSwatch={doorSwatch}
+                />
+              ) : (
+                <GenericObjectMesh dimensions={objectData.dimensions} />
+              )}
+            </RotatingRig>
+          </Suspense>
           <Backdrop />
         </Canvas>
       </div>
@@ -145,12 +157,26 @@ export default function ObjectViewer3D({
             Edge color
           </label>
           <div className="mt-2 flex gap-2">
-            {EDGE_COLOR_PRESETS.map((color) => (
+            {VALCHROMAT_COLORS.map((color) => (
               <ColorCircle
-                key={color}
+                key={color.id}
                 color={color}
-                selected={color === edgeColor}
-                onSelect={() => setEdgeColor(color)}
+                selected={color.id === edgeColorId}
+                onSelect={() => setEdgeColorId(color.id)}
+              />
+            ))}
+          </div>
+
+          <label className="mt-3 block text-xs font-medium text-neutral-500">
+            Door color
+          </label>
+          <div className="mt-2 flex gap-2">
+            {VALCHROMAT_COLORS.map((color) => (
+              <ColorCircle
+                key={color.id}
+                color={color}
+                selected={color.id === doorColorId}
+                onSelect={() => setDoorColorId(color.id)}
               />
             ))}
           </div>

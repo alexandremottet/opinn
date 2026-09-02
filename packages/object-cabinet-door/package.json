@@ -1,0 +1,14 @@
+{
+  "name": "@opinn/object-cabinet-door",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "types": "./src/index.ts",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@opinn/object-core": "workspace:*"
+  }
+}

@@ -2,6 +2,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { ObjectData } from "../../types/object";
+import { CABINET_DOOR_KIND } from "@opinn/object-cabinet-door";
 import CabinetDoorMesh from "./scene/CabinetDoorMesh";
 import GenericObjectMesh from "./scene/GenericObjectMesh";
 import Backdrop from "./scene/Backdrop";
@@ -111,7 +112,7 @@ export default function ObjectViewer3D({
           <SceneLighting />
           <CameraSway enabled={cameraSway} />
           <RotatingRig>
-            {objectData.kind === "cabinet-door" ? (
+            {objectData.kind === CABINET_DOOR_KIND ? (
               <CabinetDoorMesh
                 dimensions={objectData.dimensions}
                 colorHex={objectData.cabinetDoor?.colorHex ?? "#efece4"}

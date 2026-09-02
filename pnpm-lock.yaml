@@ -16,6 +16,12 @@ importers:
       '@astrojs/tailwind':
         specifier: ^5.1.2
         version: 5.1.5(astro@4.16.19(rollup@4.63.1)(typescript@5.9.3))(tailwindcss@3.4.19(yaml@2.9.0))
+      '@opinn/object-cabinet-door':
+        specifier: workspace:*
+        version: link:../../packages/object-cabinet-door
+      '@opinn/object-core':
+        specifier: workspace:*
+        version: link:../../packages/object-core
       '@react-three/drei':
         specifier: ^9.114.0
         version: 9.122.0(@react-three/fiber@8.18.0(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.169.0))(@types/react@18.3.31)(@types/three@0.169.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.169.0)(use-sync-external-store@1.6.0(react@18.3.1))
@@ -59,6 +65,14 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+
+  packages/object-cabinet-door:
+    dependencies:
+      '@opinn/object-core':
+        specifier: workspace:*
+        version: link:../object-core
+
+  packages/object-core: {}
 
 packages:
 

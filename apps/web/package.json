@@ -9,6 +9,8 @@
     "astro": "astro"
   },
   "dependencies": {
+    "@opinn/object-cabinet-door": "workspace:*",
+    "@opinn/object-core": "workspace:*",
     "@astrojs/react": "^3.6.2",
     "@astrojs/tailwind": "^5.1.2",
     "@react-three/drei": "^9.114.0",

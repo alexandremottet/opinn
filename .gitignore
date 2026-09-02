@@ -1,5 +1,8 @@
+.DS_Store
 .vcode
 .tokensave
+.astro/
 
 node_modules
-
+node_modules/
+dist/

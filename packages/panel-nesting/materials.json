@@ -1,0 +1,4 @@
+{
+  "solid-wood": { "kind": "strip", "maxWidthMm": 200, "lengthMm": 2000 },
+  "valchromat": { "kind": "sheet", "widthMm": 5000, "heightMm": 2500 }
+}

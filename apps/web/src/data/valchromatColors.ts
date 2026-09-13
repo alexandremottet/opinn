@@ -3,6 +3,21 @@ export interface ValchromatColor {
   label: string;
   hex: string;
   texture: string;
+  // True to tile the texture at a fixed real-world size (see TILE_SIZE_MM
+  // in CabinetDoorMesh) instead of stretching it once across the face.
+  // Right for a small repeating grain scan; wrong for a photographed
+  // full-panel swatch, which is sized to fill a face on its own.
+  tiled?: boolean;
+  // Optional PBR maps (solid wood only, so far) — omitted means flat color
+  // + a fixed roughness, same as every Valchromat swatch.
+  normalMap?: string;
+  roughnessMap?: string;
+  // Multiplies the normal map's bump strength. Omitted means 1 (full
+  // strength) — some reused scans read as too rough/bumpy for the species.
+  normalScale?: number;
+  // Multiplies the tile count from TILE_SIZE_MM (tiled swatches only).
+  // Omitted means 1 — a finer grain scan needs more tiles per face.
+  tileScale?: number;
 }
 
 // Hex values are approximate (visually sampled) — Valchromat publishes only

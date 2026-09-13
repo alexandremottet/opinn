@@ -1,0 +1,35 @@
+import { describe, it, expect } from "vitest";
+import { nest } from "../index";
+
+describe("genetic nest", () => {
+  it("places every part on a sheet, allowing rotation", () => {
+    const result = nest({
+      materialId: "valchromat",
+      parts: [
+        { id: "a", widthMm: 600, heightMm: 400, quantity: 4 },
+        { id: "b", widthMm: 300, heightMm: 300, quantity: 2 },
+      ],
+    });
+    expect(result.unplaced).toHaveLength(0);
+    expect(result.placements).toHaveLength(6);
+    expect(result.boardsUsed).toBeGreaterThan(0);
+  });
+
+  it("never rotates parts on grain-locked strips", () => {
+    const result = nest({
+      materialId: "solid-wood",
+      parts: [{ id: "p", widthMm: 150, heightMm: 900, quantity: 3 }],
+    });
+    expect(result.unplaced).toHaveLength(0);
+    expect(result.placements.every((p) => !p.rotated)).toBe(true);
+  });
+
+  it("marks a part unplaced when it can't fit on any board", () => {
+    const result = nest({
+      materialId: "solid-wood",
+      parts: [{ id: "too-wide", widthMm: 500, heightMm: 300 }],
+    });
+    expect(result.unplaced).toHaveLength(1);
+    expect(result.placements).toHaveLength(0);
+  });
+});

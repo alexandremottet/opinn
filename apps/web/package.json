@@ -9,8 +9,12 @@
     "astro": "astro"
   },
   "dependencies": {
+    "@opinn/cut-pdf": "workspace:*",
+    "@opinn/cut-positions": "workspace:*",
+    "@opinn/metod-facades": "workspace:*",
     "@opinn/object-cabinet-door": "workspace:*",
     "@opinn/object-core": "workspace:*",
+    "@opinn/panel-nesting": "workspace:*",
     "@astrojs/react": "^3.6.2",
     "@astrojs/tailwind": "^5.1.2",
     "@react-three/drei": "^9.114.0",

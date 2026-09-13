@@ -2,6 +2,7 @@
 import { getCollection } from "astro:content";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import ObjectViewer3D from "../../components/react/ObjectViewer3D";
+import CabinetDoorConfigurator from "../../components/react/CabinetDoorConfigurator";
 
 export async function getStaticPaths() {
   const objects = await getCollection("objects");
@@ -24,24 +25,42 @@ const { Content } = await entry.render();
     } mm
   </p>
 
-  <div class="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-2">
-    <div class="aspect-square w-full">
-      <ObjectViewer3D
-        client:only="react"
-        objectData={data}
-        edgeColorBackground
-      />
-    </div>
+  {
+    data.cabinetDoor ? (
+      <div class="mt-6">
+        <CabinetDoorConfigurator client:only="react" objectData={data} />
+      </div>
+    ) : (
+      <div class="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-2">
+        <div class="aspect-square w-full">
+          <ObjectViewer3D client:only="react" objectData={data} edgeColorBackground />
+        </div>
+        <div class="prose prose-neutral max-w-none">
+          <Content />
+          <a
+            href={data.downloadFile.path}
+            download
+            class="mt-4 inline-block rounded-md bg-ink px-4 py-2 text-sm text-white hover:bg-neutral-800"
+          >
+            {data.downloadFile.label}
+          </a>
+        </div>
+      </div>
+    )
+  }
 
-    <div class="prose prose-neutral max-w-none">
-      <Content />
-      <a
-        href={data.downloadFile.path}
-        download
-        class="mt-4 inline-block rounded-md bg-ink px-4 py-2 text-sm text-white hover:bg-neutral-800"
-      >
-        {data.downloadFile.label}
-      </a>
-    </div>
-  </div>
+  {
+    data.cabinetDoor && (
+      <div class="prose prose-neutral mt-8 max-w-none">
+        <Content />
+        <a
+          href={data.downloadFile.path}
+          download
+          class="mt-4 inline-block rounded-md bg-ink px-4 py-2 text-sm text-white hover:bg-neutral-800"
+        >
+          {data.downloadFile.label}
+        </a>
+      </div>
+    )
+  }
 </BaseLayout>

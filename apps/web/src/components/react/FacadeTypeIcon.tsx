@@ -62,6 +62,10 @@ export default function FacadeTypeIcon({ category, className = "h-14 w-14" }: Pr
           {/* square-ish under-counter proportions, not a short/flat box */}
           <path d="M18 8 L32 13 L18 18 L4 13 Z" {...STROKE} />
           <path d="M4 13 L18 18 L18 32 L4 27 Z" {...STROKE} />
+          {/* carcass top-right edge, exposed above the door as it tilts down —
+              the descending edge is cut short where the door's top edge
+              would otherwise cover it */}
+          <path d="M18 18 L32 13 L32 16" {...STROKE} />
           {/* door hinged at the bottom edge (fixed, shared with the carcass):
               only its free top edge swings down and toward the viewer a
               small amount — it replaces the front face, never floats below it */}

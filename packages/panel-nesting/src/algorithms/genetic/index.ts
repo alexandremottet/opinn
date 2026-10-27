@@ -3,7 +3,7 @@ import { DEEFAULT_KERF_MM } from "../../types";
 import type { PlacementAlgorithm } from "../../registry";
 import { registerPlacementAlgorithm } from "../../registry";
 import { getBoardStock } from "../../materials";
-import { boardSize, canRotate } from "../shared/geometry";
+import { boardSize, canRotate, preferShortEdgeFill, restoreOrientation } from "../shared/geometry";
 import { expandParts, alignedRotation } from "../shared/expandParts";
 import {
   alignedChromosome,
@@ -29,7 +29,9 @@ function tournamentPick(
 }
 
 export function nest(input: PlacementInput): PlacementResult {
-  const boardStock = input.boardStock ?? getBoardStock(input.materialId);
+  const { stock: boardStock, transposed } = preferShortEdgeFill(
+    input.boardStock ?? getBoardStock(input.materialId),
+  );
   const kerfMm = input.kerfMm ?? DEEFAULT_KERF_MM;
   const allowRotation = canRotate(boardStock);
   const { instances, typeIndexOf } = expandParts(input.parts);
@@ -78,7 +80,7 @@ export function nest(input: PlacementInput): PlacementResult {
   const best = population.reduce((best, chromosome) =>
     score(chromosome) < score(best) ? chromosome : best,
   );
-  const decoded = decode(best, instances, typeIndexOf, boardStock, kerfMm);
+  const decoded = restoreOrientation(decode(best, instances, typeIndexOf, boardStock, kerfMm), transposed);
 
   return { algorithmId: "genetic", materialId: input.materialId, ...decoded };
 }

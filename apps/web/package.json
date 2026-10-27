@@ -9,6 +9,7 @@
     "astro": "astro"
   },
   "dependencies": {
+    "@opinn/cut-dxf": "workspace:*",
     "@opinn/cut-pdf": "workspace:*",
     "@opinn/cut-positions": "workspace:*",
     "@opinn/metod-facades": "workspace:*",

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "@opinn/panel-nesting/algorithms/genetic";
 import {
   getBoardStock,
@@ -10,11 +10,13 @@ import {
 } from "@opinn/panel-nesting";
 import { toCutSheet, type CutSheet } from "@opinn/cut-positions";
 import { drawCutSheetPdf, BOARD_INNER_MARGIN_MM } from "@opinn/cut-pdf";
+import { generateDoorHingeDxf } from "@opinn/cut-dxf";
 import {
   METOD_FACADES,
   FACADE_CATEGORIES,
   deriveFacadeParts,
   finalSizeMm,
+  type FacadeCatalogEntry,
 } from "@opinn/metod-facades";
 import type { ObjectData } from "../../types/object";
 import { VALCHROMAT_COLORS } from "../../data/valchromatColors";
@@ -180,8 +182,8 @@ function mergeParts(parts: Part[]): Part[] {
   return [...merged.values()];
 }
 
-function downloadBytes(bytes: Uint8Array, filename: string) {
-  const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
+function downloadBytes(bytes: Uint8Array, filename: string, mimeType = "application/pdf") {
+  const blob = new Blob([new Uint8Array(bytes)], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -189,6 +191,14 @@ function downloadBytes(bytes: Uint8Array, filename: string) {
   link.click();
   URL.revokeObjectURL(url);
 }
+
+function downloadText(text: string, filename: string, mimeType: string) {
+  downloadBytes(new TextEncoder().encode(text), filename, mimeType);
+}
+
+// Only facades with concealed hinges get a boring file — drawer fronts run
+// on slides, and the dishwasher front mounts on a bracket, not a hinge cup.
+const HINGED_DOOR_CATEGORIES = new Set(["Porte", "Porte colonne"]);
 
 function widthsFor(category: string): number[] {
   return [
@@ -248,6 +258,19 @@ export default function CabinetDoorConfigurator({ objectData }: Props) {
   );
   const [quantity, setQuantity] = useState(1);
   const [selections, setSelections] = useState<QueuedFacade[]>([]);
+
+  // One boring file per distinct hinged-door size in the queue, regardless
+  // of how many finishes or how many units of it were added.
+  const hingedDoorFacades = useMemo(() => {
+    const seen = new Map<string, FacadeCatalogEntry>();
+    for (const item of selections) {
+      const entry = METOD_FACADES.find((f) => f.id === item.facadeId);
+      if (entry && HINGED_DOOR_CATEGORIES.has(entry.category)) {
+        seen.set(entry.id, entry);
+      }
+    }
+    return [...seen.values()];
+  }, [selections]);
 
   const widthOptions = useMemo(() => widthsFor(category), [category]);
   const heightOptions = useMemo(
@@ -316,12 +339,32 @@ export default function CabinetDoorConfigurator({ objectData }: Props) {
   const [edgeCutLists, setEdgeCutLists] = useState<MaterialCutList[]>([]);
   const [generating, setGenerating] = useState(false);
 
+  // Results take over the whole viewport instead of stacking below the
+  // configurator — the combined height of both was what forced a page
+  // scrollbar. Only one of the two is ever on screen at once.
+  const [view, setView] = useState<"configure" | "results">("configure");
+
+  // Both screens below are full-viewport takeovers (fixed, not part of
+  // normal document flow), so the underlying page never has scrollable
+  // content of its own — lock it for as long as this app is mounted.
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
   const handleGenerate = async () => {
     if (selections.length === 0) return;
     const algorithm = getPlacementAlgorithm(ALGORITHM_ID);
     if (!algorithm) return;
 
+    setView("results");
     setGenerating(true);
+    // Yield one tick so React can paint the results view (with its loading
+    // state) before the synchronous nesting work below blocks the thread.
+    await new Promise((resolve) => setTimeout(resolve, 0));
     try {
       // Grouped by material + color: each finish is its own physical stock,
       // so items in different finishes can never share a cut layout.
@@ -417,17 +460,196 @@ export default function CabinetDoorConfigurator({ objectData }: Props) {
     downloadBytes(bytes, `cut-panel-${slug(run.label)}.pdf`);
   };
 
+  const handleDownloadDxf = (facade: FacadeCatalogEntry) => {
+    const { widthMm, heightMm } = finalSizeMm(facade);
+    const dxf = generateDoorHingeDxf(widthMm, heightMm);
+    downloadText(dxf, `hinge-boring-${slug(facade.label)}.dxf`, "application/dxf");
+  };
+
+  if (view === "results") {
+    const hasResults =
+      panelCutLists.length > 0 || cutRuns.length > 0 || edgeCutLists.length > 0;
+
+    return (
+      <div className="fixed inset-0 z-50 flex h-dvh w-screen flex-col bg-white">
+        <div className="flex shrink-0 items-center gap-3 border-b border-neutral-200 px-4 py-3">
+          <button
+            type="button"
+            onClick={() => setView("configure")}
+            className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+          >
+            ← Back
+          </button>
+          <h2 className="text-sm font-semibold text-neutral-800">Cut results</h2>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4">
+          {generating && !hasResults && (
+            <p className="text-sm text-neutral-500">Generating…</p>
+          )}
+
+          {panelCutLists.map((list) => (
+            <div
+              key={list.materialLabel}
+              className="flex flex-col gap-2 border-t border-neutral-200 pt-4 first:border-t-0 first:pt-0"
+            >
+              <h3 className="text-xs font-semibold text-neutral-700">Panels — cut list</h3>
+              <p className="text-xs text-neutral-600">
+                Buy: <span className="font-medium">{list.materialLabel}</span> —{" "}
+                {list.stockLabel}
+              </p>
+              <table className="text-xs">
+                <thead>
+                  <tr className="text-left text-neutral-500">
+                    <th className="pr-4 font-medium">Piece</th>
+                    <th className="pr-4 font-medium">Qty (identical pieces)</th>
+                    <th className="font-medium">Unit size to cut (mm)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.parts.map((part) => (
+                    <tr key={part.id}>
+                      <td className="pr-4 py-0.5">{describePanelPart(part)}</td>
+                      <td className="pr-4 py-0.5">{part.quantity ?? 1}</td>
+                      <td className="py-0.5">
+                        {part.widthMm} × {part.heightMm}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+
+          {cutRuns.map((run) => (
+            <div
+              key={run.label}
+              className="flex flex-col gap-3 border-t border-neutral-200 pt-4 mt-4"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-xs font-semibold text-neutral-700">
+                  {run.label} ({run.material}) — boards used:{" "}
+                  {run.result.boardsUsed}, placed: {run.result.placements.length},
+                  unplaced: {run.result.unplaced.length}
+                </h3>
+                {run.result.placements.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadRun(run)}
+                    className="shrink-0 rounded-md border border-neutral-800 px-2 py-1 text-xs font-medium text-neutral-800 hover:bg-neutral-100"
+                  >
+                    Download PDF
+                  </button>
+                )}
+              </div>
+              {run.result.placements.length === 0 ? (
+                <p className="text-xs text-red-600">
+                  No cut plan — this panel doesn't fit on the standard board
+                  size for this material.
+                </p>
+              ) : (
+                // Too narrow for the nesting diagram to read as anything
+                // but noise — the numbers above and the PDF cover it.
+                <div className="hidden grid-cols-1 gap-3 sm:grid sm:grid-cols-2">
+                  {Array.from({ length: run.sheet.boardsUsed }, (_, boardIndex) => (
+                    <BoardPreview
+                      key={boardIndex}
+                      boardIndex={boardIndex}
+                      boardWidthMm={run.sheet.boardWidthMm}
+                      boardHeightMm={run.sheet.boardHeightMm}
+                      cuts={run.sheet.cuts.filter(
+                        (cut) => cut.boardIndex === boardIndex,
+                      )}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+
+          {edgeCutLists.map((list) => (
+            <div
+              key={list.materialLabel}
+              className="flex flex-col gap-2 border-t border-neutral-200 pt-4 mt-4"
+            >
+              <h3 className="text-xs font-semibold text-neutral-700">Edges — cut list</h3>
+              <p className="text-xs text-neutral-600">
+                Buy: <span className="font-medium">{list.materialLabel}</span> —{" "}
+                {list.stockLabel}
+              </p>
+              <table className="text-xs">
+                <thead>
+                  <tr className="text-left text-neutral-500">
+                    <th className="pr-4 font-medium">Piece</th>
+                    <th className="pr-4 font-medium">Size (mm)</th>
+                    <th className="font-medium">Qty</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.parts.map((part) => (
+                    <tr key={part.id}>
+                      <td className="pr-4 py-0.5">{describeEdgePart(part)}</td>
+                      <td className="pr-4 py-0.5">
+                        {part.widthMm} × {part.heightMm}
+                      </td>
+                      <td className="py-0.5">{part.quantity ?? 1}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+
+          {hingedDoorFacades.length > 0 && (
+            <div className="flex flex-col gap-2 border-t border-neutral-200 pt-4 mt-4">
+              <h3 className="text-xs font-semibold text-neutral-700">
+                Hinge boring — DXF
+              </h3>
+              <p className="text-xs text-neutral-600">
+                One file per door size, cup + 2 screws near the top edge and near the
+                bottom edge.
+              </p>
+              <div className="flex flex-col gap-1">
+                {hingedDoorFacades.map((facade) => (
+                  <div key={facade.id} className="flex items-center justify-between text-sm">
+                    <span>{facade.label}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadDxf(facade)}
+                      className="shrink-0 rounded-md border border-neutral-800 px-2 py-1 text-xs font-medium text-neutral-800 hover:bg-neutral-100"
+                    >
+                      Download DXF
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-      <div className="aspect-square w-full">
-        <ObjectViewer3D
-          objectData={previewObjectData}
-          edgeColorBackground
-          controlled={{ edgeWidthMm, edgeSwatch, doorSwatch }}
-        />
+    <div className="fixed inset-0 z-40 flex h-dvh w-screen flex-col bg-paper">
+      <div className="shrink-0 border-b border-neutral-200 bg-white px-4 py-3">
+        <h1 className="text-lg font-semibold text-neutral-900">{objectData.name}</h1>
+        <p className="text-xs text-neutral-500">
+          {objectData.dimensions.widthMm} × {objectData.dimensions.heightMm} ×{" "}
+          {objectData.dimensions.depthMm} mm
+        </p>
       </div>
 
-      <div className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-white p-4">
+      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_1fr] gap-8 overflow-hidden p-4 lg:grid-cols-2 lg:grid-rows-1">
+        <div className="aspect-square w-full lg:aspect-auto lg:h-full">
+          <ObjectViewer3D
+            objectData={previewObjectData}
+            edgeColorBackground
+            controlled={{ edgeWidthMm, edgeSwatch, doorSwatch }}
+          />
+        </div>
+
+        <div className="flex min-h-0 flex-col gap-4 overflow-y-auto rounded-lg border border-neutral-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-neutral-800">
           METOD facade selection
         </h2>
@@ -663,116 +885,7 @@ export default function CabinetDoorConfigurator({ objectData }: Props) {
             {generating ? "Generating…" : "Generate cut file(s)"}
           </button>
         </div>
-
-        {panelCutLists.map((list) => (
-          <div
-            key={list.materialLabel}
-            className="flex flex-col gap-2 border-t border-neutral-200 pt-4"
-          >
-            <h3 className="text-xs font-semibold text-neutral-700">Panels — cut list</h3>
-            <p className="text-xs text-neutral-600">
-              Buy: <span className="font-medium">{list.materialLabel}</span> —{" "}
-              {list.stockLabel}
-            </p>
-            <table className="text-xs">
-              <thead>
-                <tr className="text-left text-neutral-500">
-                  <th className="pr-4 font-medium">Piece</th>
-                  <th className="pr-4 font-medium">Size (mm)</th>
-                  <th className="font-medium">Qty</th>
-                </tr>
-              </thead>
-              <tbody>
-                {list.parts.map((part) => (
-                  <tr key={part.id}>
-                    <td className="pr-4 py-0.5">{describePanelPart(part)}</td>
-                    <td className="pr-4 py-0.5">
-                      {part.widthMm} × {part.heightMm}
-                    </td>
-                    <td className="py-0.5">{part.quantity ?? 1}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ))}
-
-        {cutRuns.map((run) => (
-          <div
-            key={run.label}
-            className="flex flex-col gap-3 border-t border-neutral-200 pt-4"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-xs font-semibold text-neutral-700">
-                {run.label} ({run.material}) — boards used:{" "}
-                {run.result.boardsUsed}, placed: {run.result.placements.length},
-                unplaced: {run.result.unplaced.length}
-              </h3>
-              {run.result.placements.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => handleDownloadRun(run)}
-                  className="shrink-0 rounded-md border border-neutral-800 px-2 py-1 text-xs font-medium text-neutral-800 hover:bg-neutral-100"
-                >
-                  Download PDF
-                </button>
-              )}
-            </div>
-            {run.result.placements.length === 0 ? (
-              <p className="text-xs text-red-600">
-                No cut plan — this panel doesn't fit on the standard board
-                size for this material.
-              </p>
-            ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {Array.from({ length: run.sheet.boardsUsed }, (_, boardIndex) => (
-                  <BoardPreview
-                    key={boardIndex}
-                    boardIndex={boardIndex}
-                    boardWidthMm={run.sheet.boardWidthMm}
-                    boardHeightMm={run.sheet.boardHeightMm}
-                    cuts={run.sheet.cuts.filter(
-                      (cut) => cut.boardIndex === boardIndex,
-                    )}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-
-        {edgeCutLists.map((list) => (
-          <div
-            key={list.materialLabel}
-            className="flex flex-col gap-2 border-t border-neutral-200 pt-4"
-          >
-            <h3 className="text-xs font-semibold text-neutral-700">Edges — cut list</h3>
-            <p className="text-xs text-neutral-600">
-              Buy: <span className="font-medium">{list.materialLabel}</span> —{" "}
-              {list.stockLabel}
-            </p>
-            <table className="text-xs">
-              <thead>
-                <tr className="text-left text-neutral-500">
-                  <th className="pr-4 font-medium">Piece</th>
-                  <th className="pr-4 font-medium">Size (mm)</th>
-                  <th className="font-medium">Qty</th>
-                </tr>
-              </thead>
-              <tbody>
-                {list.parts.map((part) => (
-                  <tr key={part.id}>
-                    <td className="pr-4 py-0.5">{describeEdgePart(part)}</td>
-                    <td className="pr-4 py-0.5">
-                      {part.widthMm} × {part.heightMm}
-                    </td>
-                    <td className="py-0.5">{part.quantity ?? 1}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ))}
+        </div>
       </div>
     </div>
   );

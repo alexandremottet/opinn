@@ -14,9 +14,12 @@ describe("first-fit-decreasing nest", () => {
     expect(result.placements).toHaveLength(6);
     expect(result.boardsUsed).toBeGreaterThan(0);
 
-    const firstRowY = Math.min(...result.placements.map((p) => p.yMm));
-    const firstRow = result.placements.filter((p) => p.yMm === firstRowY);
-    expect(firstRow.every((p) => p.partId === "big")).toBe(true);
+    // The valchromat sheet is landscape (5000x2500), so shelves pack along
+    // its short edge: the first shelf becomes a column at the left edge
+    // (shared xMm), with its parts stacked down the board's height (yMm).
+    const firstColumnX = Math.min(...result.placements.map((p) => p.xMm));
+    const firstColumn = result.placements.filter((p) => p.xMm === firstColumnX);
+    expect(firstColumn.every((p) => p.partId === "big")).toBe(true);
   });
 
   it("never rotates parts on grain-locked strips", () => {

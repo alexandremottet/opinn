@@ -1,4 +1,4 @@
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { PDFDocument, rgb, StandardFonts, degrees } from "pdf-lib";
 import type { CutSheet } from "@opinn/cut-positions";
 
 // A real, fixed page size — printable on any home/office printer — rather
@@ -15,6 +15,9 @@ const PAGE_MARGIN_MM = 15;
 // placement could legally land in what this file draws as an empty zone.
 export const BOARD_INNER_MARGIN_MM = 50;
 const TITLE_ROW_MM = 12;
+const LABEL_SIZE = 6;
+// Kept clear so a label never visually touches the cut's own border.
+const LABEL_PADDING_PT = 4;
 
 function mm(value: number): number {
   return value * MM_TO_PT;
@@ -101,13 +104,45 @@ export async function drawCutSheetPdf(sheet: CutSheet, title?: string): Promise<
         borderColor: rgb(0, 0, 0),
         borderWidth: 1,
       });
-      page.drawText(cut.partId, {
-        x: mm(cutXMm) + 2,
-        y: mm(cutYMm) + mm(cutHeightMm) - 8,
-        size: 6,
-        font,
-        color: rgb(0, 0, 0),
-      });
+      // Each label is skipped outright — never truncated or shrunk — once
+      // it no longer fits inside the cut it's labeling.
+      const partIdWidthPt = font.widthOfTextAtSize(cut.partId, LABEL_SIZE);
+      if (partIdWidthPt <= mm(cutWidthMm) - LABEL_PADDING_PT) {
+        page.drawText(cut.partId, {
+          x: mm(cutXMm) + 2,
+          y: mm(cutYMm) + mm(cutHeightMm) - 8,
+          size: LABEL_SIZE,
+          font,
+          color: rgb(0, 0, 0),
+        });
+      }
+
+      // Width, horizontal, centered along the bottom edge.
+      const widthLabel = `${cut.widthMm}`;
+      const widthLabelWidthPt = font.widthOfTextAtSize(widthLabel, LABEL_SIZE);
+      if (widthLabelWidthPt <= mm(cutWidthMm) - LABEL_PADDING_PT) {
+        page.drawText(widthLabel, {
+          x: mm(cutXMm) + (mm(cutWidthMm) - widthLabelWidthPt) / 2,
+          y: mm(cutYMm) + 3,
+          size: LABEL_SIZE,
+          font,
+          color: rgb(0, 0, 0),
+        });
+      }
+
+      // Height, vertical (rotated 90°), centered along the left edge.
+      const heightLabel = `${cut.heightMm}`;
+      const heightLabelWidthPt = font.widthOfTextAtSize(heightLabel, LABEL_SIZE);
+      if (heightLabelWidthPt <= mm(cutHeightMm) - LABEL_PADDING_PT) {
+        page.drawText(heightLabel, {
+          x: mm(cutXMm) + 9,
+          y: mm(cutYMm) + (mm(cutHeightMm) - heightLabelWidthPt) / 2,
+          size: LABEL_SIZE,
+          font,
+          color: rgb(0, 0, 0),
+          rotate: degrees(90),
+        });
+      }
     }
   }
 
